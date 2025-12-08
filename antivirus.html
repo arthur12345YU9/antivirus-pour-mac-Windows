@@ -23,19 +23,27 @@
             text-align: center;
             background: #000;
             box-shadow: 0 0 15px #0f0;
-            position: relative; /* Pour les sapins */
+            position: relative; 
         }
         
-        /* NOUVEAU : DÉCORATION DE NOËL */
+        /* MISE À JOUR : PLUS DE DÉCORATIONS LATÉRALES */
         .decoration {
             position: absolute;
             font-size: 20px;
-            color: #f00; /* Rouge de Noël */
+            color: #f00; 
             z-index: 1;
+            /* Animation simple pour un effet lumineux */
+            animation: pulse 2s infinite alternate;
         }
-        .decoration.left { top: 10px; left: 10px; }
-        .decoration.right { top: 10px; right: 10px; }
-
+        .decoration.top-left { top: 5px; left: 10px; }
+        .decoration.top-right { top: 5px; right: 10px; }
+        .decoration.mid-left { top: 40%; left: 10px; font-size: 16px; }
+        .decoration.mid-right { top: 40%; right: 10px; font-size: 16px; }
+        
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.7; }
+        }
 
         /* Boutons et Styles */
         .btn {
@@ -51,9 +59,12 @@
             line-height: 1.2;
         }
         .btn-scan { color: #0f0; border: 2px solid #0f0; }
-        .btn-assistant { color: #00cccc; border: 2px solid #00cccc; } /* Style Cyan pour l'Assistant */
+        .btn-assistant { color: #00cccc; border: 2px solid #00cccc; } 
+        .btn-modal-option { color: #000; background-color: #00cccc; border: 2px solid #00cccc; margin-top: 10px; display: block; width: 90%; margin-left: auto; margin-right: auto; }
+        
         .btn:hover:not(:disabled) { background-color: #0f0; color: #000; border-color: #0f0; }
         .btn-assistant:hover:not(:disabled) { background-color: #00cccc; color: #000; border-color: #00cccc; }
+        .btn-modal-option:hover { background-color: #00e5e5; }
 
         .btn:disabled { 
             border-color: #444; 
@@ -88,7 +99,7 @@
         #cookie-banner { position: fixed; bottom: 0; left: 0; width: 100%; background-color: #222; color: #fff; padding: 15px; text-align: center; z-index: 1000; display: none; box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5); }
         #cookie-banner button { background-color: #0f0; color: #000; border: none; padding: 8px 15px; margin-left: 20px; cursor: pointer; font-weight: bold; }
 
-        /* --- NOUVEAU : MODALE ASSISTANT --- */
+        /* MODALE ASSISTANT */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -120,12 +131,28 @@
             color: #ff0000;
             line-height: 1; 
         }
+        /* Zone de chat simulée */
+        #chat-content { 
+            min-height: 100px; 
+            background: #111; 
+            border: 1px solid #444; 
+            padding: 10px; 
+            margin-bottom: 15px; 
+            overflow-y: auto; 
+            max-height: 250px;
+        }
+        .chat-message { margin-bottom: 10px; }
+        .assistant-msg { color: #00cccc; }
+        .user-options { margin-top: 10px; text-align: center; }
     </style>
 </head>
 <body>
 
-<span class="decoration left">🎄</span>
-<span class="decoration right">🎁</span>
+<span class="decoration top-left">🎄</span>
+<span class="decoration top-right">🎁</span>
+<span class="decoration mid-left">⭐</span>
+<span class="decoration mid-right">🎄</span>
+
 
 <div class="scanner-box">
     <h1>☣️ SCANNER DE DOSSIER</h1>
@@ -169,30 +196,124 @@
     <div class="assistant-modal" onclick="event.stopPropagation()">
         <span class="close-btn" onclick="closeAssistantModal()">X</span>
         <h3>🤖 Assistant Virtuel</h3>
-        <p>Bonjour ! Je suis l'assistant de votre scanner. Je suis là pour vous aider avec vos questions techniques, même si je ne peux pas encore répondre à toutes les questions comme un humain.</p>
-        <p><strong>Comment puis-je vous aider aujourd'hui ?</strong></p>
-        <button class="btn btn-scan" onclick="closeAssistantModal()">Fermer</button>
+
+        <div id="chat-content">
+            </div>
+        
+        <div class="user-options" id="user-options">
+            </div>
+
+        <button class="btn btn-scan" onclick="closeAssistantModal()">Fermer l'Assistant</button>
     </div>
 </div>
 
 
 <script>
-    // --- NOUVELLE LOGIQUE DE MODALE ASSISTANT ---
+    // --- NOUVELLE LOGIQUE D'ASSISTANT PAR BOUTONS ---
+
+    const chatContent = document.getElementById('chat-content');
+    const userOptionsDiv = document.getElementById('user-options');
+
+    const ASSISTANT_FLOW = {
+        'start': {
+            message: "Bonjour ! Je suis l'assistant de votre scanner. Comment puis-je vous aider ?",
+            options: [
+                { text: "Problème avec le site / le code", next: 'site_problem' },
+                { text: "Le scanner ne détecte rien", next: 'scanner_detect' },
+                { text: "Faire une suggestion", next: 'suggestion' }
+            ]
+        },
+        'site_problem': {
+            message: "Avez-vous un problème de chargement, de bouton ou d'affichage ?",
+            options: [
+                { text: "Problème de bouton", next: 'button_issue' },
+                { text: "Problème d'affichage", next: 'display_issue' },
+                { text: "Retour au menu principal", next: 'start' }
+            ]
+        },
+        'button_issue': {
+            message: "Si un bouton ne fonctionne pas, veuillez vérifier que vous avez bien accepté les cookies. Si le problème persiste, cela pourrait être lié à votre navigateur. Souhaitez-vous contacter le développeur ?",
+            options: [
+                { text: "Contacter le développeur (simulé)", next: 'contact_dev' },
+                { text: "Retour au menu principal", next: 'start' }
+            ]
+        },
+        'contact_dev': {
+            message: "Merci ! Votre message a été enregistré (Ceci est une simulation pour l'instant). Nous reviendrons vers vous. Bonne journée !",
+            options: [
+                { text: "Terminer", next: 'end' }
+            ]
+        },
+        'scanner_detect': {
+            message: "Le scanner utilise une base de données de hashs limitée pour des raisons de performance. Si vous pensez qu'un fichier est infecté, veuillez le supprimer manuellement ou envoyer le hash (Ceci est une simulation).",
+            options: [
+                { text: "Retour au menu principal", next: 'start' }
+            ]
+        },
+        'suggestion': {
+            message: "Merci pour votre suggestion ! Nous notons que vous souhaitez plus de mises à jour de Noël et des améliorations visuelles (Ceci est une simulation).",
+            options: [
+                { text: "Terminer", next: 'end' }
+            ]
+        },
+        'end': {
+            message: "À bientôt ! N'oubliez pas de partager notre scanner sur vos réseaux (TikTok, Reddit) !",
+            options: []
+        }
+    };
+
+    function displayMessage(message, className = 'assistant-msg') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-message ${className}`;
+        msgDiv.textContent = message;
+        chatContent.appendChild(msgDiv);
+        // Scroll automatique vers le bas
+        chatContent.scrollTop = chatContent.scrollHeight;
+    }
+
+    function displayOptions(options) {
+        userOptionsDiv.innerHTML = ''; // Nettoie les anciens boutons
+        options.forEach(option => {
+            const button = document.createElement('button');
+            button.className = 'btn btn-modal-option';
+            button.textContent = option.text;
+            button.onclick = () => handleUserInput(option);
+            userOptionsDiv.appendChild(button);
+        });
+    }
+
+    function handleUserInput(option) {
+        // Afficher la réponse de l'utilisateur (le bouton qu'il a cliqué)
+        displayMessage(`> ${option.text}`, 'user-msg'); 
+        
+        // Aller à la prochaine étape de la conversation
+        const nextStep = ASSISTANT_FLOW[option.next];
+        if (nextStep) {
+            setTimeout(() => {
+                displayMessage(nextStep.message);
+                displayOptions(nextStep.options);
+                if (option.next === 'end') {
+                    userOptionsDiv.innerHTML = ''; // Cache les boutons à la fin
+                }
+            }, 500); // Délai pour simuler une "réflexion" de l'assistant
+        }
+    }
+
     function openAssistantModal() {
         document.getElementById('assistantModal').style.display = 'flex';
+        chatContent.innerHTML = ''; // Réinitialise la conversation
+        displayMessage(ASSISTANT_FLOW.start.message);
+        displayOptions(ASSISTANT_FLOW.start.options);
     }
 
     function closeAssistantModal(event) {
-        // Ferme si l'utilisateur clique sur le X ou sur le bouton Fermer
-        if (event && event.target.id === 'assistantModal') {
-            document.getElementById('assistantModal').style.display = 'none';
-        } else if (!event) {
+        if (!event || event.target.id === 'assistantModal') {
             document.getElementById('assistantModal').style.display = 'none';
         }
     }
 
 
-    // --- LOGIQUE DE CONSENTEMENT ET D'INITIALISATION ---
+    // --- LOGIQUE DE CONSENTEMENT ET D'INITIALISATION (inchangée) ---
     
     function acceptCookies() {
         localStorage.setItem('cookieAccepted', 'true');
@@ -218,7 +339,7 @@
         }
     }
 
-    // --- Variables et initialisation ---
+    // --- Variables et initialisation (inchangée) ---
     let allScannedFiles = []; 
     // Hash d'un fichier vide pour l'exemple de virus
     const VIRUS_DB = ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"];
